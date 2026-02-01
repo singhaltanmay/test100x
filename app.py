@@ -1,6 +1,7 @@
 import streamlit as st
 import openai
 import os
+from streamlit_mic_recorder import mic_recorder
 
 # Configure Streamlit page
 st.set_page_config(
@@ -48,6 +49,13 @@ st.markdown("""
         text-align: center;
         color: #10a37f;
         margin-bottom: 30px;
+    }
+    .voice-box {
+        background: #f0f0f0;
+        padding: 15px;
+        border-radius: 8px;
+        margin: 10px 0;
+        border-left: 4px solid #10a37f;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -97,6 +105,22 @@ SUGGESTED_QUESTIONS = [
     "How do you approach learning new technologies?",
 ]
 
+# Function to get bot response
+def get_bot_response(messages):
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                *messages
+            ],
+            max_tokens=500,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error: {str(e)}"
+
 # Main interface
 col1, col2 = st.columns([3, 1])
 with col1:
@@ -116,9 +140,10 @@ for message in st.session_state.conversation_history:
 # Input section
 st.markdown("---")
 
-# Tab for custom question or suggested questions
-tab1, tab2 = st.tabs(["📝 Ask Custom Question", "💡 Suggested Questions"])
+# Tab for different input methods
+tab1, tab2, tab3 = st.tabs(["📝 Text Question", "🎤 Voice Input", "💡 Suggested Questions"])
 
+# TAB 1: Text input
 with tab1:
     user_question = st.text_input(
         "Your question:",
@@ -135,18 +160,52 @@ with tab1:
             
             # Get bot response
             with st.spinner("Thinking..."):
-                try:
-                    response = openai.ChatCompletion.create(
-                        model="gpt-3.5-turbo",
-                        messages=[
-                            {"role": "system", "content": SYSTEM_PROMPT},
-                            *st.session_state.conversation_history
-                        ],
-                        max_tokens=500,
-                        temperature=0.7
-                    )
-                    
-                    bot_response = response.choices[0].message.content
+                bot_response = get_bot_response(st.session_state.conversation_history)
+                
+                # Add bot response to history
+                st.session_state.conversation_history.append({
+                    "role": "assistant",
+                    "content": bot_response
+                })
+                
+                st.rerun()
+
+# TAB 2: Voice input
+with tab2:
+    st.info("🎤 Click the microphone to record your question")
+    
+    # Mic recorder component
+    audio = mic_recorder(
+        start_prompt="🎤 Start Recording",
+        stop_prompt="⏹️ Stop Recording",
+        key="recorder"
+    )
+    
+    if audio:
+        # Save audio temporarily and transcribe
+        with st.spinner("Transcribing your voice..."):
+            try:
+                # Save the audio file
+                audio_bytes = audio['bytes']
+                with open("temp_audio.wav", "wb") as f:
+                    f.write(audio_bytes)
+                
+                # Transcribe using OpenAI Whisper API
+                with open("temp_audio.wav", "rb") as audio_file:
+                    transcript = openai.Audio.transcribe("whisper-1", audio_file)
+                
+                user_question = transcript["text"]
+                st.success(f"✅ Transcribed: '{user_question}'")
+                
+                # Add user message to history
+                st.session_state.conversation_history.append({
+                    "role": "user",
+                    "content": user_question
+                })
+                
+                # Get bot response
+                with st.spinner("Thinking..."):
+                    bot_response = get_bot_response(st.session_state.conversation_history)
                     
                     # Add bot response to history
                     st.session_state.conversation_history.append({
@@ -155,11 +214,17 @@ with tab1:
                     })
                     
                     st.rerun()
-                except Exception as e:
-                    st.error(f"Error getting response: {str(e)}")
+                
+                # Clean up temp file
+                if os.path.exists("temp_audio.wav"):
+                    os.remove("temp_audio.wav")
+                
+            except Exception as e:
+                st.error(f"Error processing voice: {str(e)}")
 
-with tab2:
-    st.write("Select a suggested question or ask your own:")
+# TAB 3: Suggested questions
+with tab3:
+    st.write("Select a suggested question:")
     selected_question = st.selectbox(
         "Suggested questions:",
         SUGGESTED_QUESTIONS,
@@ -175,34 +240,22 @@ with tab2:
         
         # Get bot response
         with st.spinner("Thinking..."):
-            try:
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        *st.session_state.conversation_history
-                    ],
-                    max_tokens=500,
-                    temperature=0.7
-                )
-                
-                bot_response = response.choices[0].message.content
-                
-                # Add bot response to history
-                st.session_state.conversation_history.append({
-                    "role": "assistant",
-                    "content": bot_response
-                })
-                
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error getting response: {str(e)}")
+            bot_response = get_bot_response(st.session_state.conversation_history)
+            
+            # Add bot response to history
+            st.session_state.conversation_history.append({
+                "role": "assistant",
+                "content": bot_response
+            })
+            
+            st.rerun()
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: gray; font-size: 12px;'>
     <p>100x Generative AI Developer Assessment - Stage 1</p>
-    <p>Powered by OpenAI GPT-3.5 | Streamlit</p>
+    <p>🤖 Powered by OpenAI GPT-3.5 + Whisper | Streamlit</p>
+    <p>Features: Text Input | Voice Input | Suggested Questions</p>
 </div>
 """, unsafe_allow_html=True)
