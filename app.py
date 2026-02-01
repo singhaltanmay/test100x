@@ -1,7 +1,10 @@
 import streamlit as st
 import os
 from groq import Groq
-import streamlit.components.v1 as components
+from streamlit_mic_recorder import mic_recorder
+import speech_recognition as sr
+from pydub import AudioSegment
+import tempfile
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="AI Agent Voice Bot", page_icon="🤖", layout="centered")
@@ -39,6 +42,24 @@ def get_bot_response(messages):
     )
     return response.choices[0].message.content
 
+# ---------------- SPEECH TO TEXT ----------------
+def speech_to_text(audio_bytes):
+    r = sr.Recognizer()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+        f.write(audio_bytes)
+        temp_path = f.name
+
+    audio = AudioSegment.from_file(temp_path)
+    audio.export(temp_path, format="wav")
+
+    with sr.AudioFile(temp_path) as source:
+        audio_data = r.record(source)
+
+    try:
+        return r.recognize_google(audio_data)
+    except:
+        return ""
+
 # ---------------- HEADER ----------------
 st.title("🤖 AI Agent Voice Bot")
 
@@ -53,56 +74,25 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
-# ---------------- VOICE COMPONENT ----------------
-voice_html = """
-<script>
-const streamlitDoc = window.parent;
+# ---------------- MIC RECORDER ----------------
+audio = mic_recorder(start_prompt="🎤 Speak", stop_prompt="⏹ Stop")
 
-function sendTextToStreamlit(text){
-    streamlitDoc.postMessage({
-        type: "streamlit:setComponentValue",
-        value: text
-    }, "*");
-}
-
-function startDictation(){
-    if (!('webkitSpeechRecognition' in window)){
-        alert("Use Chrome or Edge");
-        return;
-    }
-    const rec = new webkitSpeechRecognition();
-    rec.lang = "en-US";
-    rec.start();
-
-    rec.onresult = function(e){
-        const text = e.results[0][0].transcript;
-        sendTextToStreamlit(text);
-    };
-}
-</script>
-
-<button onclick="startDictation()"
-style="padding:10px 16px;border-radius:8px;background:#FF6B35;color:white;border:none;cursor:pointer;">
-🎤 Speak
-</button>
-"""
-
-voice_result = components.html(voice_html, height=70)
-
-# If voice returned text, store it
-if voice_result:
-    st.session_state.voice_text = voice_result
+if audio:
+    text = speech_to_text(audio["bytes"])
+    if text:
+        st.session_state.voice_text = text
+        st.success(f"Recognized: {text}")
 
 # ---------------- INPUT ----------------
 user_question = st.text_input(
     "Your question:",
     value=st.session_state.voice_text,
-    placeholder="Type or click 🎤",
+    placeholder="Type or use mic..."
 )
 
 if st.button("Send"):
     if user_question.strip():
-        st.session_state.voice_text = ""  # reset
+        st.session_state.voice_text = ""
         st.session_state.conversation_history.append({"role":"user","content":user_question})
 
         with st.spinner("Thinking..."):
@@ -112,4 +102,4 @@ if st.button("Send"):
         st.rerun()
 
 # ---------------- FOOTER ----------------
-st.markdown("<p style='text-align:center;color:gray;'>Voice Enabled</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;color:gray;'>Voice Enabled via streamlit_mic_recorder</p>", unsafe_allow_html=True)
