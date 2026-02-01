@@ -3,7 +3,7 @@ import os
 from groq import Groq
 from streamlit_mic_recorder import mic_recorder
 import speech_recognition as sr
-from pydub import AudioSegment
+# from pydub import AudioSegment
 import tempfile
 
 # ---------------- PAGE CONFIG ----------------
@@ -45,12 +45,10 @@ def get_bot_response(messages):
 # ---------------- SPEECH TO TEXT ----------------
 def speech_to_text(audio_bytes):
     r = sr.Recognizer()
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
         f.write(audio_bytes)
         temp_path = f.name
-
-    audio = AudioSegment.from_file(temp_path)
-    audio.export(temp_path, format="wav")
 
     with sr.AudioFile(temp_path) as source:
         audio_data = r.record(source)
@@ -59,6 +57,7 @@ def speech_to_text(audio_bytes):
         return r.recognize_google(audio_data)
     except:
         return ""
+
 
 # ---------------- HEADER ----------------
 st.title("🤖 AI Agent Voice Bot")
