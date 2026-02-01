@@ -3,7 +3,8 @@ import os
 from groq import Groq
 from streamlit_mic_recorder import mic_recorder
 import speech_recognition as sr
-# from pydub import AudioSegment
+from pydub import AudioSegment
+import io
 import tempfile
 
 # ---------------- PAGE CONFIG ----------------
@@ -46,16 +47,19 @@ def get_bot_response(messages):
 def speech_to_text(audio_bytes):
     r = sr.Recognizer()
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
-        f.write(audio_bytes)
-        temp_path = f.name
+    # Convert WebM/OGG → WAV in memory
+    audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
+    wav_io = io.BytesIO()
+    audio.export(wav_io, format="wav")
+    wav_io.seek(0)
 
-    with sr.AudioFile(temp_path) as source:
+    # SpeechRecognition reads WAV
+    with sr.AudioFile(wav_io) as source:
         audio_data = r.record(source)
 
     try:
         return r.recognize_google(audio_data)
-    except:
+    except Exception:
         return ""
 
 
