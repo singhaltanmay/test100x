@@ -10,7 +10,7 @@ import tempfile
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="AI Interview Voice Bot", page_icon="🎙", layout="centered")
 
-# ---------------- CSS (UI IMPROVED ONLY) ----------------
+# ---------------- CSS ----------------
 st.markdown("""
 <style>
 .chat-container {display:flex;flex-direction:column;gap:12px;}
@@ -47,7 +47,7 @@ if not api_key:
 
 client = Groq(api_key=api_key)
 
-# ---------------- SYSTEM PROMPT (UPDATED ONLY) ----------------
+# ---------------- SYSTEM PROMPT ----------------
 SYSTEM_PROMPT = """
 You are an AI voice bot representing the candidate who built this application.
 You are currently in Stage 1 of the 100x Generative AI Developer Assessment.
@@ -94,7 +94,7 @@ def speech_to_text(audio_bytes):
     except Exception:
         return ""
 
-# ---------------- HEADER (UPDATED ONLY) ----------------
+# ---------------- HEADER ----------------
 st.markdown(
     "<h1 style='text-align:center;color:#FF6B35;'>🎙 AI Interview Voice Bot</h1>",
     unsafe_allow_html=True
@@ -123,16 +123,22 @@ for m in st.session_state.conversation_history:
         st.markdown(f"<div class='bot-bubble'>{m['content']}</div>", unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("---")
-
-# ---------------- MIC RECORDER ----------------
-audio = mic_recorder(start_prompt="🎤 Speak", stop_prompt="⏹ Stop")
+# ---------------- MIC RECORDER (FIXED) ----------------
+mic_container = st.container()
+with mic_container:
+    audio = mic_recorder(
+        start_prompt="🎤 Speak",
+        stop_prompt="⏹ Stop",
+        key="mic_recorder_component"
+    )
 
 if audio:
     text = speech_to_text(audio["bytes"])
     if text:
         st.session_state.voice_text = text
         st.success(f"Recognized: {text}")
+
+st.markdown("---")
 
 # ---------------- INPUT ----------------
 user_question = st.text_input(
@@ -156,7 +162,7 @@ if st.button("Send"):
         )
         st.rerun()
 
-# ---------------- FOOTER (UPDATED ONLY) ----------------
+# ---------------- FOOTER ----------------
 st.markdown("""
 <hr>
 <p style='text-align:center;color:gray;font-size:13px;'>
