@@ -1,7 +1,6 @@
 import streamlit as st
-import openai
 import os
-from streamlit_mic_recorder import mic_recorder
+from groq import Groq
 
 # Configure Streamlit page
 st.set_page_config(
@@ -22,40 +21,33 @@ st.markdown("""
         width: 100%;
         height: 50px;
         font-size: 16px;
-        background: linear-gradient(90deg, #10a37f 0%, #0a7d62 100%);
+        background: linear-gradient(90deg, #FF6B35 0%, #F7931E 100%);
         color: white;
         border: none;
         border-radius: 8px;
         font-weight: bold;
     }
     .stButton > button:hover {
-        background: linear-gradient(90deg, #0a7d62 0%, #10a37f 100%);
+        background: linear-gradient(90deg, #F7931E 0%, #FF6B35 100%);
     }
     .response-box {
         background: #f0f2f6;
         padding: 20px;
         border-radius: 8px;
         margin: 10px 0;
-        border-left: 4px solid #10a37f;
+        border-left: 4px solid #FF6B35;
     }
     .question-box {
         background: #e8f0ff;
         padding: 15px;
         border-radius: 8px;
         margin: 10px 0;
-        border-left: 4px solid #10a37f;
+        border-left: 4px solid #FF6B35;
     }
     .header {
         text-align: center;
-        color: #10a37f;
+        color: #FF6B35;
         margin-bottom: 30px;
-    }
-    .voice-box {
-        background: #f0f0f0;
-        padding: 15px;
-        border-radius: 8px;
-        margin: 10px 0;
-        border-left: 4px solid #10a37f;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -64,19 +56,21 @@ st.markdown("""
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 if "api_key_set" not in st.session_state:
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
     st.session_state.api_key_set = bool(api_key)
     if api_key:
-        openai.api_key = api_key
+        st.session_state.client = Groq(api_key=api_key)
+    else:
+        st.session_state.client = None
 
 # Header
 st.markdown("<h1 class='header'>🤖 AI Agent Voice Bot</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: gray;'>100x Generative AI Developer Assessment</p>", unsafe_allow_html=True)
 
 # Check if API key is available
-if not st.session_state.api_key_set:
-    st.error("❌ API Key not configured. Please set OPENAI_API_KEY environment variable.")
-    st.info("For deployment, this is automatically configured. For local testing, set your API key.")
+if st.session_state.client is None:
+    st.error("❌ API Key not configured. Please set GROQ_API_KEY environment variable.")
+    st.info("Get free API key at: https://console.groq.com/keys")
     st.stop()
 
 # System prompt for the bot personality
@@ -108,8 +102,8 @@ SUGGESTED_QUESTIONS = [
 # Function to get bot response
 def get_bot_response(messages):
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+        response = st.session_state.client.chat.completions.create(
+            model="mixtral-8x7b-32768",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 *messages
@@ -141,7 +135,7 @@ for message in st.session_state.conversation_history:
 st.markdown("---")
 
 # Tab for different input methods
-tab1, tab2, tab3 = st.tabs(["📝 Text Question", "🎤 Voice Input", "💡 Suggested Questions"])
+tab1, tab2 = st.tabs(["📝 Text Question", "💡 Suggested Questions"])
 
 # TAB 1: Text input
 with tab1:
@@ -170,60 +164,8 @@ with tab1:
                 
                 st.rerun()
 
-# TAB 2: Voice input
+# TAB 2: Suggested questions
 with tab2:
-    st.info("🎤 Click the microphone to record your question")
-    
-    # Mic recorder component
-    audio = mic_recorder(
-        start_prompt="🎤 Start Recording",
-        stop_prompt="⏹️ Stop Recording",
-        key="recorder"
-    )
-    
-    if audio:
-        # Save audio temporarily and transcribe
-        with st.spinner("Transcribing your voice..."):
-            try:
-                # Save the audio file
-                audio_bytes = audio['bytes']
-                with open("temp_audio.wav", "wb") as f:
-                    f.write(audio_bytes)
-                
-                # Transcribe using OpenAI Whisper API
-                with open("temp_audio.wav", "rb") as audio_file:
-                    transcript = openai.Audio.transcribe("whisper-1", audio_file)
-                
-                user_question = transcript["text"]
-                st.success(f"✅ Transcribed: '{user_question}'")
-                
-                # Add user message to history
-                st.session_state.conversation_history.append({
-                    "role": "user",
-                    "content": user_question
-                })
-                
-                # Get bot response
-                with st.spinner("Thinking..."):
-                    bot_response = get_bot_response(st.session_state.conversation_history)
-                    
-                    # Add bot response to history
-                    st.session_state.conversation_history.append({
-                        "role": "assistant",
-                        "content": bot_response
-                    })
-                    
-                    st.rerun()
-                
-                # Clean up temp file
-                if os.path.exists("temp_audio.wav"):
-                    os.remove("temp_audio.wav")
-                
-            except Exception as e:
-                st.error(f"Error processing voice: {str(e)}")
-
-# TAB 3: Suggested questions
-with tab3:
     st.write("Select a suggested question:")
     selected_question = st.selectbox(
         "Suggested questions:",
@@ -255,7 +197,7 @@ st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: gray; font-size: 12px;'>
     <p>100x Generative AI Developer Assessment - Stage 1</p>
-    <p>🤖 Powered by OpenAI GPT-3.5 + Whisper | Streamlit</p>
-    <p>Features: Text Input | Voice Input | Suggested Questions</p>
+    <p>🤖 Powered by Groq (Mixtral 8x7B) | Free & Fast | Streamlit</p>
+    <p>Features: Text Input | Suggested Questions | Chat History</p>
 </div>
 """, unsafe_allow_html=True)
