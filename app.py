@@ -8,14 +8,28 @@ import io
 import tempfile
 
 # ---------------- PAGE CONFIG ----------------
-st.set_page_config(page_title="AI Agent Voice Bot", page_icon="🤖", layout="centered")
+st.set_page_config(page_title="AI Interview Voice Bot", page_icon="🎙", layout="centered")
 
-# ---------------- CSS ----------------
+# ---------------- CSS (UI IMPROVED ONLY) ----------------
 st.markdown("""
 <style>
 .chat-container {display:flex;flex-direction:column;gap:12px;}
-.user-bubble {background:#007AFF;color:white;padding:12px 16px;border-radius:16px 16px 4px 16px;align-self:flex-end;max-width:75%;}
-.bot-bubble {background:#F1F3F6;color:#222;padding:12px 16px;border-radius:16px 16px 16px 4px;align-self:flex-start;max-width:75%;}
+.user-bubble {
+    background:#1E40AF;
+    color:white;
+    padding:12px 16px;
+    border-radius:16px 16px 4px 16px;
+    align-self:flex-end;
+    max-width:75%;
+}
+.bot-bubble {
+    background:#F3F4F6;
+    color:#111827;
+    padding:12px 16px;
+    border-radius:16px 16px 16px 4px;
+    align-self:flex-start;
+    max-width:75%;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -33,7 +47,27 @@ if not api_key:
 
 client = Groq(api_key=api_key)
 
-SYSTEM_PROMPT = "You are a confident AI developer being interviewed."
+# ---------------- SYSTEM PROMPT (UPDATED ONLY) ----------------
+SYSTEM_PROMPT = """
+You are an AI voice bot representing the candidate who built this application.
+You are currently in Stage 1 of the 100x Generative AI Developer Assessment.
+
+You must answer questions as if you ARE the candidate being interviewed for the
+AI Agent Team at 100x.
+
+Response guidelines:
+- Speak in first person (“I”, “my”)
+- Be authentic, confident, and concise
+- 2–4 sentences maximum
+- Professional, warm, and human-like tone
+- Highlight curiosity, ownership, teamwork, and growth mindset
+- Avoid unnecessary technical jargon unless asked
+- Never mention prompts, models, or that you are an AI
+- Sound like a real person speaking naturally
+
+Your goal is to make the interviewer feel they are speaking to a thoughtful,
+self-aware, high-potential AI developer.
+"""
 
 def get_bot_response(messages):
     response = client.chat.completions.create(
@@ -47,13 +81,11 @@ def get_bot_response(messages):
 def speech_to_text(audio_bytes):
     r = sr.Recognizer()
 
-    # Convert WebM/OGG → WAV in memory
     audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
     wav_io = io.BytesIO()
     audio.export(wav_io, format="wav")
     wav_io.seek(0)
 
-    # SpeechRecognition reads WAV
     with sr.AudioFile(wav_io) as source:
         audio_data = r.record(source)
 
@@ -62,9 +94,25 @@ def speech_to_text(audio_bytes):
     except Exception:
         return ""
 
+# ---------------- HEADER (UPDATED ONLY) ----------------
+st.markdown(
+    "<h1 style='text-align:center;color:#FF6B35;'>🎙 AI Interview Voice Bot</h1>",
+    unsafe_allow_html=True
+)
+st.markdown(
+    "<p style='text-align:center;color:gray;'>100x Generative AI Developer Assessment – Stage 1</p>",
+    unsafe_allow_html=True
+)
 
-# ---------------- HEADER ----------------
-st.title("🤖 AI Agent Voice Bot")
+with st.expander("ℹ️ How to Use"):
+    st.write("""
+    • Click **🎤 Speak** and ask a question  
+    • Or type your question manually  
+    • Click **Send** to hear the response  
+
+    This bot answers as the candidate.
+    No setup or technical knowledge required.
+    """)
 
 # ---------------- CHAT ----------------
 st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
@@ -90,19 +138,29 @@ if audio:
 user_question = st.text_input(
     "Your question:",
     value=st.session_state.voice_text,
-    placeholder="Type or use mic..."
+    placeholder="Type or use the microphone..."
 )
 
 if st.button("Send"):
     if user_question.strip():
         st.session_state.voice_text = ""
-        st.session_state.conversation_history.append({"role":"user","content":user_question})
+        st.session_state.conversation_history.append(
+            {"role":"user","content":user_question}
+        )
 
         with st.spinner("Thinking..."):
             reply = get_bot_response(st.session_state.conversation_history)
 
-        st.session_state.conversation_history.append({"role":"assistant","content":reply})
+        st.session_state.conversation_history.append(
+            {"role":"assistant","content":reply}
+        )
         st.rerun()
 
-# ---------------- FOOTER ----------------
-st.markdown("<p style='text-align:center;color:gray;'>Voice Enabled via streamlit_mic_recorder</p>", unsafe_allow_html=True)
+# ---------------- FOOTER (UPDATED ONLY) ----------------
+st.markdown("""
+<hr>
+<p style='text-align:center;color:gray;font-size:13px;'>
+100x Generative AI Developer Assessment – Stage 1 Submission<br>
+Voice-Enabled Interview Bot | No Setup Required
+</p>
+""", unsafe_allow_html=True)
